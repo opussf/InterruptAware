@@ -23,7 +23,7 @@ jobs:
           java-version: 1.8
 
       - name: Set up Lua
-        uses: leafo/gh-actions-lua@v7
+        uses: leafo/gh-actions-lua@v8
         with:
           luaVersion: "5.3.5"
 
