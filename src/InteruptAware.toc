@@ -1,0 +1,9 @@
+## Interface: @INTERFACE@
+## Title: Interupt Aware
+## Notes: Show interupts, and who could still interupt. @VERSION@
+## Author: opussf
+## Version: @VERSION@
+## Description: Desc and stuff
+## SavedVariables: InteruptAware_options InteruptAware_log
+InteruptAware.lua
+InteruptAware.xml
