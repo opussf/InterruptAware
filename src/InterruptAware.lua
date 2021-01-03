@@ -1,20 +1,20 @@
-INTERUPTAWARE_SLUG, InteruptAware = ...
-INTERUPTAWARE_MSG_VERSION = GetAddOnMetadata( INTERUPTAWARE_SLUG, "Version" )
-INTERUPTAWARE_MSG_ADDONNAME = GetAddOnMetadata( INTERUPTAWARE_SLUG, "Title" )
-INTERUPTAWARE_MSG_AUTHOR = GetAddOnMetadata( INTERUPTAWARE_SLUG, "Author" )
+INTERRUPTAWARE_SLUG, InterruptAware = ...
+INTERRUPTAWARE_MSG_VERSION = GetAddOnMetadata( INTERRUPTAWARE_SLUG, "Version" )
+INTERRUPTAWARE_MSG_ADDONNAME = GetAddOnMetadata( INTERRUPTAWARE_SLUG, "Title" )
+INTERRUPTAWARE_MSG_AUTHOR = GetAddOnMetadata( INTERRUPTAWARE_SLUG, "Author" )
 
 -- Colours
 COLOR_NEON_BLUE = "|cff4d4dff";
 COLOR_END = "|r";
 
-InteruptAware_log = {}
+InterruptAware_log = {}
 
-function InteruptAware.Print( msg, showName )
+function InterruptAware.Print( msg, showName )
 	-- print to the chat frame
 	-- set showName to false to suppress the addon name printing
 	if (showName == nil) or (showName) then
 		msg = string.format( "%s%s>%s %s",
-				COLOR_NEON_BLUE, INTERUPTAWARE_SLUG, COLOR_END, msg )
+				COLOR_NEON_BLUE, INTERRUPTAWARE_SLUG, COLOR_END, msg )
 	end
 	DEFAULT_CHAT_FRAME:AddMessage( msg )
 end
@@ -23,36 +23,36 @@ LOG_CRITICAL = 1
 LOG_ERROR = 2
 LOG_WARNING = 3
 LOG_INFO = 4
-InteruptAware_options = { ["debugLevel"] = LOG_INFO }
+InterruptAware_options = { ["debugLevel"] = LOG_INFO }
 
-function InteruptAware.LogMsg( msg, debugLevel, alsoPrint )
+function InterruptAware.LogMsg( msg, debugLevel, alsoPrint )
 	-- debugLevel  (Always - nil), (Critical - 1), (Error - 2), (Warning - 3), (Info - 4)
 	if( debugLevel == nil ) or
-			( ( debugLevel and InteruptAware_options.debugLevel ) and InteruptAware_options.debugLevel >= debugLevel ) then
-		table.insert( InteruptAware_log, { [time()] = (debugLevel and debugLevel..": " or "" )..msg } )
+			( ( debugLevel and InterruptAware_options.debugLevel ) and InterruptAware_options.debugLevel >= debugLevel ) then
+		table.insert( InterruptAware_log, { [time()] = (debugLevel and debugLevel..": " or "" )..msg } )
 		if( alsoPrint ) then
-			InteruptAware.Print( msg )
+			InterruptAware.Print( msg )
 		end
 	end
 end
-function InteruptAware.OnLoad()
-	InteruptAwareFrame:RegisterEvent( "ADDON_LOADED" )
-	InteruptAwareFrame:RegisterEvent( "COMBAT_LOG_EVENT_UNFILTERED" )
+function InterruptAware.OnLoad()
+	InterruptAwareFrame:RegisterEvent( "ADDON_LOADED" )
+	InterruptAwareFrame:RegisterEvent( "COMBAT_LOG_EVENT_UNFILTERED" )
 end
-function InteruptAware.ADDON_LOADED()
-	InteruptAware:UnregisterEvent( "ADDON_LOADED" )
+function InterruptAware.ADDON_LOADED()
+	InterruptAware:UnregisterEvent( "ADDON_LOADED" )
 	local expireTS = time() - 604800
 	local pruneCount = 0
 	local minPrune = time()
 	local maxPrune = 0
 	local doPrune = true
 	while( doPrune ) do
-		if( InteruptAware_log and InteruptAware_log[1] ~= nil ) then    -- has to exist, and have something at index 1
-			for ts, _ in pairs( InteruptAware_log[1] ) do           -- look in the pairs, since we don't know the key value
+		if( InterruptAware_log and InterruptAware_log[1] ~= nil ) then    -- has to exist, and have something at index 1
+			for ts, _ in pairs( InterruptAware_log[1] ) do           -- look in the pairs, since we don't know the key value
 				if( ts < expireTS ) then                        -- if this is too old, remove it
 					maxPrune = math.max( maxPrune, ts )
 					minPrune = math.min( minPrune, ts )
-					table.remove( InteruptAware_log, 1 )
+					table.remove( InterruptAware_log, 1 )
 					pruneCount = pruneCount + 1
 				else                                            -- all others will be too young to delete, stop
 					doPrune = false
@@ -63,24 +63,24 @@ function InteruptAware.ADDON_LOADED()
 		end
 	end
 	if( pruneCount > 0 ) then
-		InteruptAware.LogMsg( "Pruned "..pruneCount.." log entries, from "..
+		InterruptAware.LogMsg( "Pruned "..pruneCount.." log entries, from "..
 			date( "%c", minPrune ).." to "..date( "%c", maxPrune ).."." )  -- set to (info - 4)?
 	end
 end
-InteruptAware.reportEvents = {
+InterruptAware.reportEvents = {
 	["SPELL_AURA_BROKEN"]  = true,
 	["SPELL_AURA_BROKEN_SPELL"] = true,
 	["SPELL_AURA_REMOVED"] = true,
 }
-function InteruptAware.COMBAT_LOG_EVENT_UNFILTERED()
+function InterruptAware.COMBAT_LOG_EVENT_UNFILTERED()
 	local _, t, _, sourceID, sourceName, sourceFlags, sourceRaidFlags,
 			destID, destName, destFlags, _, spellID, spName, _, ext1, ext2, ext3 = CombatLogGetCurrentEventInfo()
 	print( t )
-	InteruptAware.LogMsg( t..": "..sourceName.." -> "..destName, LOG_INFO, true )
+	InterruptAware.LogMsg( t..": "..sourceName.." -> "..destName, LOG_INFO, true )
 
-	if InteruptAware.reportEvents[t] then
-		InteruptAware.LogMsg( "Tracking "..t, LOG_INFO, true )
-		InteruptAware.LogMsg( "<<<"..spellID..">>> on "..destName.." removed by "..sourceName, LOG_INFO, true )
+	if InterruptAware.reportEvents[t] then
+		InterruptAware.LogMsg( "Tracking "..t, LOG_INFO, true )
+		InterruptAware.LogMsg( "<<<"..spellID..">>> on "..destName.." removed by "..sourceName, LOG_INFO, true )
 	end
 
 --[[

@@ -1,13 +1,13 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.blizzard.com/wow/ui/">
 	<!-- Version 2.0 -->
-	<Frame name="InteruptAwareFrame"  frameStrata="BACKGROUND" toplevel="false" parent="UIParent">
+	<Frame name="InterruptAwareFrame"  frameStrata="BACKGROUND" toplevel="false" parent="UIParent">
 		<Scripts>
 			<OnLoad>
-				InteruptAware.OnLoad()
+				InterruptAware.OnLoad()
 			</OnLoad>
 			<OnEvent>
-				InteruptAware[event](self, ...)
+				InterruptAware[event](self, ...)
 			</OnEvent>
 		</Scripts>
 	</Frame>
