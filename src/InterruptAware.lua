@@ -40,7 +40,7 @@ function InterruptAware.OnLoad()
 	InterruptAwareFrame:RegisterEvent( "COMBAT_LOG_EVENT_UNFILTERED" )
 end
 function InterruptAware.ADDON_LOADED()
-	InterruptAware:UnregisterEvent( "ADDON_LOADED" )
+	InterruptAwareFrame:UnregisterEvent( "ADDON_LOADED" )
 	local expireTS = time() - 604800
 	local pruneCount = 0
 	local minPrune = time()
@@ -64,24 +64,68 @@ function InterruptAware.ADDON_LOADED()
 	end
 	if( pruneCount > 0 ) then
 		InterruptAware.LogMsg( "Pruned "..pruneCount.." log entries, from "..
-			date( "%c", minPrune ).." to "..date( "%c", maxPrune ).."." )  -- set to (info - 4)?
+			date( "%c", minPrune ).." to "..date( "%c", maxPrune )..".", LOG_INFO, true )  -- set to (info - 4)?
 	end
 end
 InterruptAware.reportEvents = {
 	["SPELL_AURA_BROKEN"]  = true,
 	["SPELL_AURA_BROKEN_SPELL"] = true,
 	["SPELL_AURA_REMOVED"] = true,
+	["SPELL_INTERRUPT"] = true,
 }
 function InterruptAware.COMBAT_LOG_EVENT_UNFILTERED()
+	-- ignore pvp
+	if UnitIsPVP("player") then
+		return
+	end
+
 	local _, t, _, sourceID, sourceName, sourceFlags, sourceRaidFlags,
 			destID, destName, destFlags, _, spellID, spName, _, ext1, ext2, ext3 = CombatLogGetCurrentEventInfo()
-	print( t )
-	InterruptAware.LogMsg( t..": "..sourceName.." -> "..destName, LOG_INFO, true )
 
-	if InterruptAware.reportEvents[t] then
-		InterruptAware.LogMsg( "Tracking "..t, LOG_INFO, true )
-		InterruptAware.LogMsg( "<<<"..spellID..">>> on "..destName.." removed by "..sourceName, LOG_INFO, true )
+	--skip outsiders
+	if bit.band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_OUTSIDER) > 0
+		and bit.band(destFlags, COMBATLOG_OBJECT_AFFILIATION_OUTSIDER) > 0 then
+			--InterruptAware.LogMsg( t..": Skipping outsider.", LOG_INFO )
+			return
 	end
+
+		-- skip events that have nil values for src or dst, but allow death events
+	if t ~= "PARTY_KILL" and t ~= "UNIT_DIED" and t ~= "UNIT_DESTROYED" and t ~= "UNIT_DISSIPATES" and not string.find(t, "_INSTAKILL")
+			and (not sourceName or not destName ) then
+		--InterruptAware.LogMsg( t..": Nil src or dest for non-kill event.", LOG_INFO )
+		return
+	end
+
+	-- skip is self buff or auras
+	if( sourceID == destID or sourceName == destName ) then
+		return
+	end
+
+
+--	InterruptAware.LogMsg( table.concat( { t,
+--			(sourceID or "no sourceID"), (sourceName or "no sourceName"), (sourceFlags or "no sourceFlags"), (sourceRaidFlags or "no sourceRaidFlags"),
+--			(destID or "no destID"), (destName or "no destName"), (destFlags or "no destFlags"), " ",
+--			spellID, spName, " ", (ext1 or "no ext1"), (ext2 or "no ext2"), (ext3 or "no ext3") }, "," ), LOG_INFO, false )
+
+
+	sourceName = sourceName or "unknown"
+	destName = destName or "unknown"
+	spName = (spName and (type(spName) == "boolean" and (spName and "true" or "false")) or "no spell?" )
+
+	--InterruptAware.LogMsg( t..": "..GetSpellLink( spellID ).." from "..sourceName.." on "..destName, LOG_INFO, true )
+	--InterruptAware.LogMsg( t..": "..spName.." from "..sourceName.." on "..destName, LOG_INFO, true )
+	--InterruptAware.LogMsg( t..": "..sourceName.." -> "..destName, LOG_INFO, true )
+
+
+	if InterruptAware.reportEvents[t] and sourceID ~= destID then
+		--InterruptAware.LogMsg( "Tracking "..t, LOG_INFO, true )
+		--InterruptAware.LogMsg( t.." <<<"..spellID..">>> on "..destName.." removed by "..sourceName, LOG_INFO, true )
+		InterruptAware.LogMsg( t..": "..GetSpellLink( spellID) .. "\124r\124h\124h on \124cffff0000"..destName.."\124r\124h\124h removed by "..sourceName, LOG_INFO, false )
+		InterruptAware.LogMsg( table.concat( {t, sourceID, sourceName, sourceFlags, destID, destName, destFlags, "SpellID:", spellID, spName}, "," ), LOG_INFO, false )
+	else
+		--InterruptAware.LogMsg( t, LOG_INFO, true )
+	end
+
 
 --[[
 
