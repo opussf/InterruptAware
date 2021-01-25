@@ -12,6 +12,9 @@ InterruptAware.defeatedEnemiesList = {}
 InterruptAware.playersInCombat = {}
 InterruptAware.enemiesInCombat  = {}
 InterruptAware.bossesInCombat = {}
+InterruptAware.maxDefeated = 0
+
+InterruptAware.runPrune = true
 
 function InterruptAware.Print( msg, showName )
 	-- print to the chat frame
@@ -39,6 +42,41 @@ function InterruptAware.LogMsg( msg, debugLevel, alsoPrint )
 		end
 	end
 end
+function InterruptAware.PruneLog()
+	if InterruptAware.runPrune then
+		local expireTS = time() - 604800
+		local pruneCount = 0
+		local minPrune = 0
+		local maxPrune = 0
+		local doPrune = true
+		while( doPrune ) do
+			if( InterruptAware_log and InterruptAware_log[1] ~= nil ) then    -- has to exist, and have something at index 1
+				for ts, _ in pairs( InterruptAware_log[1] ) do           -- look in the pairs, since we don't know the key value
+					if( ts < expireTS ) then                        -- if this is too old, remove it
+						maxPrune = math.max( maxPrune, ts )
+						minPrune = math.min( minPrune, ts )
+						table.remove( InterruptAware_log, 1 )
+						pruneCount = pruneCount + 1
+					else                                            -- all others will be too young to delete, stop
+						doPrune = false
+						InterruptAware.runPrune = false
+					end
+					if pruneCount >= 5000 then
+						doPrune = false
+						break
+					end
+				end
+			else                                                    -- nothing exists to process
+				doPrune = false
+				InterruptAware.runPrune = false
+			end
+		end
+		if( pruneCount > 0 ) then
+			InterruptAware.LogMsg( "Pruned "..pruneCount.." log entries, from "..
+				date( "%c", minPrune ).." to "..date( "%c", maxPrune )..".", LOG_INFO, true )  -- set to (info - 4)?
+		end
+	end
+end
 function InterruptAware.OnLoad()
 	InterruptAwareFrame:RegisterEvent( "ADDON_LOADED" )
 	InterruptAwareFrame:RegisterEvent( "COMBAT_LOG_EVENT_UNFILTERED" )
@@ -46,33 +84,12 @@ function InterruptAware.OnLoad()
 end
 function InterruptAware.ADDON_LOADED()
 	InterruptAwareFrame:UnregisterEvent( "ADDON_LOADED" )
-	local expireTS = time() - 604800
-	local pruneCount = 0
-	local minPrune = time()
-	local maxPrune = 0
-	local doPrune = true
-	while( doPrune ) do
-		if( InterruptAware_log and InterruptAware_log[1] ~= nil ) then    -- has to exist, and have something at index 1
-			for ts, _ in pairs( InterruptAware_log[1] ) do           -- look in the pairs, since we don't know the key value
-				if( ts < expireTS ) then                        -- if this is too old, remove it
-					maxPrune = math.max( maxPrune, ts )
-					minPrune = math.min( minPrune, ts )
-					table.remove( InterruptAware_log, 1 )
-					pruneCount = pruneCount + 1
-				else                                            -- all others will be too young to delete, stop
-					doPrune = false
-				end
-			end
-		else                                                    -- nothing exists to process
-			doPrune = false
-		end
-	end
-	if( pruneCount > 0 ) then
-		InterruptAware.LogMsg( "Pruned "..pruneCount.." log entries, from "..
-			date( "%c", minPrune ).." to "..date( "%c", maxPrune )..".", LOG_INFO, true )  -- set to (info - 4)?
-	end
+	InterruptAware.PruneLog()
 end
 function InterruptAware.ResetCombatData()
+	if( InterruptAware.runPrune ) then
+		InterruptAware.PruneLog()
+	end
 	InterruptAware.LogMsg( "ResetCombatData", LOG_INFO )
 	InterruptAware.playersInCombat = {}
 	InterruptAware.enemiesInCombat = {}
@@ -83,7 +100,7 @@ function InterruptAware.ResetCombatData()
 	--playerInCombat = false
 	--runningCombatCheck = false
 	--playersWereInCombat = false
-	maxDefeated = 0
+	InterruptAware.maxDefeated = 0
 end
 --[[
 function EgoBooster:enterCombatChecks(input)
@@ -187,7 +204,7 @@ function InterruptAware.COMBAT_LOG_EVENT_UNFILTERED()
 
 	if t == "PARTY_KILL" or t == "UNIT_DIED" or t == "UNIT_DESTROYED" or t == "UNIT_DISSIPATES" or string.find(t, "_INSTAKILL") then
 		isUnitKilled = true
-		InterruptAware.LogMsg( destName .." killed by "..sourceName )
+		InterruptAware.LogMsg( destName .." killed by ".. (sourceName or "unknown" ) )
 	end
 
 	if not isUnitKilled and (hostileDest or hostileSource) and not string.find(enemyIDToCheck, "Player") then
@@ -235,16 +252,43 @@ function InterruptAware.COMBAT_LOG_EVENT_UNFILTERED()
 				InterruptAware.LogMsg( "add boss "..t.." "..destName.." : "..sourceName.." = "..enemyIDToCheck, LOG_INFO )
 				isEnemyBoss = true
 				InterruptAware.fightHadBosses = true
-				table.insert( bossesInCombat, enemyIDToCheck )
+				table.insert( InterruptAware.bossesInCombat, enemyIDToCheck )
 			end
 		end
 		if not isEnemyBoss then
 			InterruptAware.LogMsg( "add enemy "..t.." "..destName.." : "..sourceName.." = "..enemyIDToCheck, LOG_INFO )
 			InterruptAware.fightHadEnemies = true
-			maxDefeated = maxDefeated + 1
+			InterruptAware.maxDefeated = InterruptAware.maxDefeated + 1
+		end
+	end
+	if isUnitKilled and (hostileDest or hostileSource) and not string.find( enemyIDToCheck, "Player" ) then
+		local enemyListPos = -1
+		local foundEnemy = false
+
+		for i, eid in pairs( InterrupteAware.enemiesInCombat) do
+			if eid == enemyIDToCheck then
+				--print("removing enemy", enemyIDToCheck)
+				foundEnemy = true
+				local idWithResetTime = enemyIDToCheck .. ">>>" .. time() + 15
+				InterruptAware.LogMsg( "removing enemy "..idWithResetTime, LOG_INFO )
+				table.insert( InterruptAware.defeatedEnemiesList, idWithResetTime )
+				table.remove( InterruptAware.enemiesInCombat, i )
+			end
 		end
 
+		if not foundEnemy then
+			for i, eid in pairs( InterrupteAware.bossesInCombat) do
+				if eid == enemyIDToCheck then
+					--print("removing boss", enemyIDToCheck)
+					local idWithResetTime = enemyIDToCheck .. ">>>" .. time() + 15
+					InterruptAware.LogMsg( "removing boss "..idWithResetTime, LOG_INFO )
+					table.insert( InterruptAware.defeatedEnemiesList, idWithResetTime)
+					table.remove( InterruptAware.bossesInCombat, i)
+				end
+			end
+		end
 	end
+
 --	InterruptAware.LogMsg( table.concat( { t,
 --			(sourceID or "no sourceID"), (sourceName or "no sourceName"), (sourceFlags or "no sourceFlags"), (sourceRaidFlags or "no sourceRaidFlags"),
 --			(destID or "no destID"), (destName or "no destName"), (destFlags or "no destFlags"), " ",
